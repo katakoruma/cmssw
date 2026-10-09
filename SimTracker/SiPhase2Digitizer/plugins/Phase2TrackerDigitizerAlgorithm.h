@@ -154,6 +154,7 @@ protected:
   // -- add_noise
   const bool addNoise_;
   const bool addNoisyPixels_;
+  const bool checkAllModulesForNoisyCells_;  // generate noisy cells also on modules without SimHits
   const bool fluctuateCharge_;
 
   //-- pixel efficiency
