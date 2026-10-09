@@ -128,6 +128,12 @@ Phase2TrackerDigitizerAlgorithm::Phase2TrackerDigitizerAlgorithm(const edm::Para
       // Add noisy pixels
       addNoisyPixels_(conf_specific.getParameter<bool>("AddNoisyPixels")),
 
+      // Check ALL modules to find noisy cells, else only modules with at least one SimHit
+      // (backport of cms-sw/cmssw 0a522d3; a missing parameter keeps the old behaviour)
+      checkAllModulesForNoisyCells_(conf_specific.existsAs<bool>("CheckAllModulesForNoisyCells")
+                                        ? conf_specific.getParameter<bool>("CheckAllModulesForNoisyCells")
+                                        : false),
+
       // Fluctuate charge in track subsegments
       fluctuateCharge_(conf_specific.getUntrackedParameter<bool>("FluctuateCharge", true)),
 
@@ -895,7 +901,8 @@ void Phase2TrackerDigitizerAlgorithm::digitize(const Phase2TrackerGeomDetUnit* p
                                                const TrackerTopology* tTopo) {
   uint32_t detID = pixdet->geographicalId().rawId();
   auto it = _signal.find(detID);
-  if (it == _signal.end())
+  // Modules without SimHits are skipped unless noisy cells are requested on all modules
+  if (!checkAllModulesForNoisyCells_ && (it == _signal.end()))
     return;
 
   const signal_map_type& theSignal = _signal[detID];
@@ -920,8 +927,15 @@ void Phase2TrackerDigitizerAlgorithm::digitize(const Phase2TrackerGeomDetUnit* p
     add_noise(pixdet);  // generate noise
   if (addXtalk_)
     add_cross_talk(pixdet);
-  if (addNoisyPixels_)
-    add_noisy_cells(pixdet, theHIPThresholdInE / theElectronPerADC_);
+  if (addNoisyPixels_) {
+    // The noise generator expects the threshold in units of the noise. The previous argument,
+    // theHIPThresholdInE / theElectronPerADC_, is in ADC counts of the HIP threshold (1e10/135
+    // for 2S modules), so no noisy cells were ever generated. Backport of cms-sw/cmssw 9592918.
+    float thresholdInNoiseUnits = 99.9;
+    if (theNoiseInElectrons_)
+      thresholdInNoiseUnits = theThresholdInE / theNoiseInElectrons_;
+    add_noisy_cells(pixdet, thresholdInNoiseUnits);
+  }
 
   // Do only if needed
   if (addPixelInefficiency_ && !theSignal.empty()) {
