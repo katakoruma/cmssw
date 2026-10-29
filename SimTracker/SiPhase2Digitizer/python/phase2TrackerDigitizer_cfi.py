@@ -213,6 +213,12 @@ phase2TrackerDigitizer = cms.PSet(
       HitDetectionMode = cms.int32(0),  # (0/1/2/3/4 => SquareWindow/SampledMode/LatchedMode/SampledOrLachedMode/HIPFindingMode)
       PulseShapeParameters = cms.vdouble(-3.0, 16.043703, 99.999857, 40.571650, 2.0, 1.2459094),
       CBCDeadTime = cms.double(0.0), # (2.7 ns deadtime in latched mode)
+      # Common-mode noise: sigma of the noise common to a hybrid and to a CBC, as fractions of NoiseInElectrons
+      # (the per-strip part keeps the rest, so the total strip noise is unchanged), and the correlation of the
+      # common mode of the two hybrids of a module. 0 = no common mode.
+      CommonModeCBCFraction = cms.double(0.0),
+      CommonModeHybridFraction = cms.double(0.0),
+      CommonModeHybridCorrelation = cms.double(0.0),
       UseReweighting = cms.bool(False),
     )
 )
