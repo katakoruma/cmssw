@@ -18,7 +18,6 @@
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
 #include "FWCore/Utilities/interface/Exception.h"
 
-#include "CLHEP/Random/RandBinomial.h"
 #include "CLHEP/Random/RandFlat.h"
 #include "CLHEP/Random/RandGaussQ.h"
 
@@ -53,6 +52,25 @@ namespace {
       x = std::sqrt(s * s - 2 * std::log(v));
     } while (x * u > s);
     return x;
+  }
+  // Binomial(n, p) deviate by inversion of the cumulative distribution, exact also for very small p
+  // (CLHEP::RandBinomial returns 0 for p <= 1e-5); on average 1 + n p steps
+  int binomial(int n, double p, CLHEP::HepRandomEngine* engine) {
+    if (p <= 0.)
+      return 0;
+    if (p >= 1.)
+      return n;
+    const double u = CLHEP::RandFlat::shoot(engine);
+    const double ratio = p / (1. - p);
+    double pk = std::exp(n * std::log1p(-p));  // P(0)
+    double cdf = pk;
+    int k = 0;
+    while (u > cdf && k < n) {
+      pk *= ratio * (n - k) / (k + 1);
+      cdf += pk;
+      ++k;
+    }
+    return k;
   }
 }  // namespace
 
@@ -337,7 +355,7 @@ void SSDigitizerAlgorithm::add_noisy_channels(const Phase2TrackerGeomDetUnit* ph
       // A strip of this CBC fires if its own noise is above the threshold minus the common mode
       const double cut = (threshold - cmValue) / sigma;
       const double probability = 0.5 * std::erfc(cut / std::sqrt(2.));
-      const int nNoisy = static_cast<int>(CLHEP::RandBinomial::shoot(rengine_, nStrips, probability));
+      const int nNoisy = binomial(nStrips, probability, rengine_);
       // distinct strips by a partial Fisher-Yates shuffle
       std::iota(strips.begin(), strips.begin() + nStrips, firstStrip);
       for (int i = 0; i < nNoisy; ++i) {
